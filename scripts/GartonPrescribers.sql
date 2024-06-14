@@ -8,38 +8,86 @@
 
 -- 1.  a. Which prescriber had the highest total number of claims 
 -- 	(totaled over all drugs)? Report the npi and the total number of claims.
-select *
-FROM prescriber
-left JOIN prescription
-USING (npi);
-
-
 
 --     b. Repeat the above, but this time report the nppes_provider_first_name,
 -- 	nppes_provider_last_org_name,  specialty_description, and the total number of claims.
 
+-- Select count(distinct prescription.npi) AS num_claims, nppes_provider_first_name,
+--  	nppes_provider_last_org_name,  specialty_description
+-- from prescription
+-- 	left join prescriber
+-- 	using (npi)
+-- Group by nppes_provider_first_name,
+--  	nppes_provider_last_org_name,  specialty_description
+-- 	order by num_claims desc;
+
 
 -- 2. a. Which specialty had the most total number of claims (totaled over all drugs)?
+-- SELECT 
+-- 	sum(total_claim_count) num_claims ,specialty_description
+-- FROM prescription
+-- 	left join prescriber
+-- 	using (npi)
+-- GROUP BY specialty_description
+-- ORDER BY num_claims desc;
 
+-- 9752347 "Family Practice"
 
 --     b. Which specialty had the most total number of claims for opioids?
 
+-- SELECT 
+-- 	SUM(total_claim_count) num_claims ,specialty_description
+-- FROM prescription
+-- 	LEFT JOIN prescriber
+-- 	USING (npi)
+-- 	RIGHT JOIN drug
+-- 	ON prescription.drug_name = drug.drug_name
+-- 	WHERE opioid_drug_flag = 'Y'
+-- GROUP BY specialty_description
+-- ORDER BY num_claims DESC;
+
+-- 900845 Nurse Practitioner
 
 --     c. **Challenge Question:** Are there any specialties that appear in
 -- 	the prescriber table that have no associated prescriptions in the prescription table?
 
+-- SELECT specialty_description
+-- from prescriber
+-- left join prescription
+-- using (npi)
+-- Where total_claim_count IS NOT NULL;
 
 --     d. **Difficult Bonus:** *Do not attempt until you have solved all 
--- other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
+-- other problems!* For each specialty, report the percentage of total claims by 
+-- that specialty which are for opioids. Which specialties have a high percentage
+-- 	of opioids?
+
 
 
 -- 3.  a. Which drug (generic_name) had the highest total drug cost?
 
+-- SELECT drug.generic_name, prescription.total_drug_cost
+-- FROM drug
+-- LEFT JOIN prescription
+-- USING (drug_name)
+-- WHERE total_drug_cost IS NOT NULL
+-- ORDER BY total_drug_cost DESC
+-- ;
+-- "PIRFENIDONE" 2829174.3
 
 --  b. Which drug (generic_name) has the hightest total cost per day?
 -- **Bonus: Round your cost per day column to 2 decimal places. 
 -- 	Google ROUND to see how this works.**
 
+-- SELECT 
+-- 	drug.generic_name,
+-- 	ROUND((prescription.total_drug_cost/prescription.total_30_day_fill_count),2) AS cost_per_diem 
+-- FROM drug
+-- LEFT JOIN prescription
+-- USING (drug_name)
+-- WHERE total_drug_cost IS NOT NULL
+-- ORDER BY total_drug_cost DESC
+-- ;
 
 --  4. a. For each drug in the drug table, return the drug name and 
 -- then a column named 'drug_type' which says 'opioid' for drugs which
@@ -48,15 +96,62 @@ USING (npi);
 -- 	drugs. **Hint:** You may want to use a CASE expression for this.
 -- 	See https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-case/ 
 
+-- SELECT
+-- 	drug_name,
+-- CASE WHEN opioid_drug_flag = 'Y' THEN 'opioid'
+-- 	WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+-- ELSE 'neither' END drug_type
+-- FROM drug;
 
 --     b. Building off of the query you wrote for part a, determine
 -- whether more was spent (total_drug_cost) on opioids or on antibiotics. 
 -- 	Hint: Format the total costs as MONEY for easier comparision.
 
+-- SELECT SUM(total_drug_cost):: MONEY as total
+ 
+-- FROM prescription
+-- 	join drug
+-- 	using (drug_name)
+-- 	INNER join (SELECT
+-- 	drug_name,
+-- CASE WHEN opioid_drug_flag = 'Y' THEN 'opioid'
+-- 	WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+-- ELSE 'neither' END drug_type
+-- FROM drug
+-- ) AS this_thing
+-- 	WHERE this_thing LIKE 'opioid' OR this_thing like 'antibiotic'
+-- 	;
+-- I made the above and ased AI to help out with the below
+
+-- WITH drug_classification AS (
+--     SELECT
+--         drug_name,
+--         CASE 
+--             WHEN opioid_drug_flag = 'Y' THEN 'opioid'
+--             WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+--             ELSE 'neither' 
+--         END AS drug_type
+--     FROM drug
+-- )
+-- SELECT 
+--     drug_type,
+--     SUM(total_drug_cost)::MONEY AS total_cost
+-- FROM 
+--     prescription
+-- JOIN 
+--     drug_classification USING (drug_name)
+-- WHERE 
+--     drug_type IN ('opioid', 'antibiotic')
+-- GROUP BY 
+--     drug_type;
 
 -- 5. a. How many CBSAs are in Tennessee? **Warning:** The cbsa table
 -- 	contains information for all states, not just Tennessee.
 
+
+-- count cbsas
+
+-- where state not like 'TN'
 
 --     b. Which cbsa has the largest combined population? Which has the 
 -- 	smallest? Report the CBSA name and total population.
