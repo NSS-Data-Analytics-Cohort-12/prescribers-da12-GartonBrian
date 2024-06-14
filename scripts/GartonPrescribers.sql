@@ -9,6 +9,18 @@
 -- 1.  a. Which prescriber had the highest total number of claims 
 -- 	(totaled over all drugs)? Report the npi and the total number of claims.
 
+-- SELECT 
+-- 	DISTINCT(nppes_provider_last_org_name),
+-- 	SUM(total_claim_count) AS num_claims
+-- FROM prescriber
+-- LEFT JOIN prescription
+-- USING (npi)
+-- WHERE total_claim_count IS NOT NULL
+-- 	GROUP BY nppes_provider_last_org_name
+-- ORDER BY num_claims DESC
+-- LIMIT 10;
+
+
 --     b. Repeat the above, but this time report the nppes_provider_first_name,
 -- 	nppes_provider_last_org_name,  specialty_description, and the total number of claims.
 
@@ -107,78 +119,108 @@
 -- whether more was spent (total_drug_cost) on opioids or on antibiotics. 
 -- 	Hint: Format the total costs as MONEY for easier comparision.
 
--- SELECT SUM(total_drug_cost):: MONEY as total
- 
--- FROM prescription
--- 	join drug
--- 	using (drug_name)
--- 	INNER join (SELECT
--- 	drug_name,
--- CASE WHEN opioid_drug_flag = 'Y' THEN 'opioid'
--- 	WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
--- ELSE 'neither' END drug_type
--- FROM drug
--- ) AS this_thing
--- 	WHERE this_thing LIKE 'opioid' OR this_thing like 'antibiotic'
--- 	;
--- I made the above and ased AI to help out with the below
-
--- WITH drug_classification AS (
---     SELECT
---         drug_name,
---         CASE 
---             WHEN opioid_drug_flag = 'Y' THEN 'opioid'
---             WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
---             ELSE 'neither' 
---         END AS drug_type
---     FROM drug
--- )
 -- SELECT 
 --     drug_type,
 --     SUM(total_drug_cost)::MONEY AS total_cost
--- FROM 
---     prescription
+-- FROM prescription
 -- JOIN 
---     drug_classification USING (drug_name)
--- WHERE 
---     drug_type IN ('opioid', 'antibiotic')
--- GROUP BY 
---     drug_type;
+--     ( SELECT
+--         drug_name,
+--         CASE WHEN opioid_drug_flag = 'Y' THEN 'opioid'
+--             WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+--             ELSE 'neither' END AS drug_type
+-- 		FROM drug
+-- ) USING (drug_name)
+-- WHERE drug_type IN ('opioid', 'antibiotic')
+-- GROUP BY drug_type;
 
 -- 5. a. How many CBSAs are in Tennessee? **Warning:** The cbsa table
 -- 	contains information for all states, not just Tennessee.
 
 
--- count cbsas
-
--- where state not like 'TN'
+-- SELECT COUNT(c.cbsa) AS num_cbsa
+-- FROM fips_county AS home
+-- 	JOIN cbsa AS c
+-- 	ON home.fipscounty = c.fipscounty
+-- 	JOIN population AS pop
+-- 	ON home.fipscounty = pop.fipscounty
+-- 	WHERE home.state LIKE 'TN';
 
 --     b. Which cbsa has the largest combined population? Which has the 
 -- 	smallest? Report the CBSA name and total population.
 
+-- SELECT 	pop.population,
+-- 	c.cbsaname
+-- FROM fips_county AS home
+-- 	JOIN cbsa AS c
+-- 	ON home.fipscounty = c.fipscounty
+-- 	JOIN population AS pop
+-- 	ON home.fipscounty = pop.fipscounty
+-- 	ORDER BY pop.population DESC;
+-- 8773 "Nashville-Davidson--Murfreesboro--Franklin, TN"
+-- 937847 "Memphis, TN-MS-AR"
 
 --     c. What is the largest (in terms of population) county which is
 -- 	not included in a CBSA? Report the county name and population.
+-- SELECT 	pop.population,
+-- 	c.cbsaname, 
+-- 	home.county,
+-- 	home.state,
+-- 	c.cbsa
+-- FROM fips_county AS home
+-- 	LEFT JOIN cbsa AS c
+-- 	ON home.fipscounty = c.fipscounty
+-- 	JOIN population AS pop
+-- 	ON home.fipscounty = pop.fipscounty
+-- 	WHERE c.cbsa IS NULL
+-- 	ORDER BY pop.population DESC
+-- 	;
 
+-- 95523 "SEVIER"
 
 -- 6.a. Find all rows in the prescription table where total_claims is
 -- 	at least 3000. Report the drug_name and the total_claim_count.
+-- SELECT 
+-- 	drug_name,
+-- 	total_claim_count
+-- FROM prescription
+-- WHERE total_claim_count >= 3000;
 
 
 --     b. For each instance that you found in part a, add a column that
 -- 	indicates whether the drug is an opioid.
-
+-- SELECT 
+-- 	drug_name,
+-- 	total_claim_count,
+-- 	CASE WHEN drug.opioid_drug_flag = 'Y' THEN 'opioid'
+-- 	ELSE 'not opioid' END AS is_opioid
+-- FROM prescription AS pre
+-- 	JOIN drug AS drug
+-- 	USING (drug_name)
+-- WHERE total_claim_count >= 3000
 
 --     c. Add another column to you answer from the previous part which
 -- 	gives the prescriber first and last name associated with each row.
-
+-- SELECT 
+-- 	drug_name,
+-- 	total_claim_count,
+-- 	CASE WHEN drug.opioid_drug_flag = 'Y' THEN 'opioid'
+-- 	ELSE 'not opioid' END AS is_opioid,
+-- 	scrib.nppes_provider_first_name AS scribe_first_name,
+-- 	scrib.nppes_provider_last_org_name AS scribe_last_name
+-- FROM prescription AS pre
+-- 	JOIN drug AS drug
+-- 	USING (drug_name)
+-- 	JOIN prescriber AS scrib
+-- 	USING (npi)
+-- WHERE total_claim_count >= 3000
 
 -- 7. The goal of this exercise is to generate a full list of all pain 
 -- 	management specialists in Nashville and the number of claims they had for each opioid. **Hint:** The results from all 3 parts will have 637 rows.
 
-
 --     a. First, create a list of all npi/drug_name combinations for pain
 -- 	management specialists (specialty_description = 'Pain Management) in the city of Nashville (nppes_provider_city = 'NASHVILLE'), where the drug is an opioid (opiod_drug_flag = 'Y'). **Warning:** Double-check your query before running it. You will only need to use the prescriber and drug tables since you don't need the claims numbers yet.
+
 
 
 --     b. Next, report the number of claims per drug per prescriber.
