@@ -10,13 +10,13 @@
 -- 	(totaled over all drugs)? Report the npi and the total number of claims.
 
 -- SELECT 
--- 	DISTINCT(nppes_provider_last_org_name),
+-- 	DISTINCT(npi),
 -- 	SUM(total_claim_count) AS num_claims
 -- FROM prescriber
 -- LEFT JOIN prescription
 -- USING (npi)
 -- WHERE total_claim_count IS NOT NULL
--- 	GROUP BY nppes_provider_last_org_name
+-- 	GROUP BY prescriber.npi
 -- ORDER BY num_claims DESC
 -- LIMIT 10;
 
@@ -67,7 +67,7 @@
 -- from prescriber
 -- left join prescription
 -- using (npi)
--- Where total_claim_count IS NOT NULL;
+-- Where total_claim_count IS NULL;
 
 --     d. **Difficult Bonus:** *Do not attempt until you have solved all 
 -- other problems!* For each specialty, report the percentage of total claims by 
@@ -78,12 +78,14 @@
 
 -- 3.  a. Which drug (generic_name) had the highest total drug cost?
 
--- SELECT drug.generic_name, prescription.total_drug_cost
--- FROM drug
--- LEFT JOIN prescription
+-- SELECT drug.generic_name, SUM(prescription.total_drug_cost) :: MONEY
+-- FROM prescription
+-- INNER JOIN drug
 -- USING (drug_name)
--- WHERE total_drug_cost IS NOT NULL
--- ORDER BY total_drug_cost DESC
+-- 	group BY drug.generic_name, prescription.total_drug_cost
+
+-- ORDER BY sum(total_drug_cost) DESC
+-- 	LIMIT 10
 -- ;
 -- "PIRFENIDONE" 2829174.3
 
@@ -93,11 +95,12 @@
 
 -- SELECT 
 -- 	drug.generic_name,
--- 	ROUND((prescription.total_drug_cost/prescription.total_30_day_fill_count),2) AS cost_per_diem 
+-- 	ROUND((sum(prescription.total_drug_cost)/sum(prescription.total_30_day_fill_count)),2) AS cost_per_diem 
 -- FROM drug
 -- LEFT JOIN prescription
 -- USING (drug_name)
--- WHERE total_drug_cost IS NOT NULL
+-- 	WHERE total_drug_cost IS NOT NULL
+-- 	GROUP BY drug.generic_name, prescription.total_drug_cost
 -- ORDER BY total_drug_cost DESC
 -- ;
 
@@ -149,13 +152,14 @@
 --     b. Which cbsa has the largest combined population? Which has the 
 -- 	smallest? Report the CBSA name and total population.
 
--- SELECT 	pop.population,
+-- SELECT 	SUM(pop.population),
 -- 	c.cbsaname
 -- FROM fips_county AS home
 -- 	JOIN cbsa AS c
 -- 	ON home.fipscounty = c.fipscounty
 -- 	JOIN population AS pop
 -- 	ON home.fipscounty = pop.fipscounty
+-- 	GROUP BY c.cbsaname, pop.population
 -- 	ORDER BY pop.population DESC;
 -- 8773 "Nashville-Davidson--Murfreesboro--Franklin, TN"
 -- 937847 "Memphis, TN-MS-AR"
@@ -201,6 +205,7 @@
 
 --     c. Add another column to you answer from the previous part which
 -- 	gives the prescriber first and last name associated with each row.
+
 -- SELECT 
 -- 	drug_name,
 -- 	total_claim_count,
@@ -216,21 +221,58 @@
 -- WHERE total_claim_count >= 3000
 
 -- 7. The goal of this exercise is to generate a full list of all pain 
--- 	management specialists in Nashville and the number of claims they had for each opioid. **Hint:** The results from all 3 parts will have 637 rows.
+-- 	management specialists in Nashville and the number of claims they had for each opioid.
+-- **Hint:** The results from all 3 parts will have 637 rows.
 
 --     a. First, create a list of all npi/drug_name combinations for pain
--- 	management specialists (specialty_description = 'Pain Management) in the city of Nashville (nppes_provider_city = 'NASHVILLE'), where the drug is an opioid (opiod_drug_flag = 'Y'). **Warning:** Double-check your query before running it. You will only need to use the prescriber and drug tables since you don't need the claims numbers yet.
+-- 	management specialists (specialty_description = 'Pain Management) in the city of Nashville
+-- (nppes_provider_city = 'NASHVILLE'), where the drug is an opioid (opiod_drug_flag = 'Y').
+-- 	**Warning:** Double-check your query before running it. You will only need to use
+-- 	the prescriber and drug tables since you don't need the claims numbers yet.
 
-
+-- SELECT 
+--     scribe.npi,
+--     d.drug_name
+-- FROM prescriber AS scribe
+-- CROSS JOIN drug AS d
+-- WHERE scribe.specialty_description = 'Pain Management'
+-- AND scribe.nppes_provider_city = 'NASHVILLE'
+-- AND opioid_drug_flag = 'Y';
 
 --     b. Next, report the number of claims per drug per prescriber.
 -- 	Be sure to include all combinations, whether or not the prescriber 
 -- 	had any claims. You should report the npi, the drug name, and the 
 -- 	number of claims (total_claim_count).
 
+-- SELECT 
+--     scribe.npi,
+--     d.drug_name,
+-- 	total_claim_count
+-- FROM prescriber AS scribe
+-- CROSS JOIN drug AS d
+-- 	LEFT JOIN prescription AS script 
+-- ON scribe.npi = script.npi AND d.drug_name = script.drug_name
+-- WHERE scribe.specialty_description = 'Pain Management'
+-- AND scribe.nppes_provider_city = 'NASHVILLE'
+-- AND opioid_drug_flag = 'Y';
 
 --     c. Finally, if you have not done so already, fill in any missing
 -- 	values for total_claim_count with 0. Hint - Google the COALESCE function.
+
+-- SELECT DISTINCT(npi)
+-- 	FROM
+-- (SELECT 
+--     scribe.npi,
+--     d.drug_name,
+-- 	COALESCE(total_claim_count, 0) AS num_pre
+-- FROM prescriber AS scribe
+-- CROSS JOIN drug AS d
+-- 	LEFT JOIN prescription AS script 
+-- ON scribe.npi = script.npi AND d.drug_name = script.drug_name
+-- WHERE scribe.specialty_description = 'Pain Management'
+-- AND scribe.nppes_provider_city = 'NASHVILLE'
+-- AND opioid_drug_flag = 'Y'
+-- 	ORDER BY num_pre DESC)	;
 
 
 
@@ -238,35 +280,125 @@
 -- 1. How many npi numbers appear in the prescriber table 
 -- 	but not in the prescription table?
 
+-- SELECT COUNT(npi) AS num_of_npi
+-- FROM prescriber
+-- 	EXCEPT 
+-- SELECT npi
+-- 	FROM prescription;
+
+--  num_of_npi 25050
+
 -- 2.
 --     a. Find the top five drugs (generic_name) prescribed 
 -- 	by prescribers with the specialty of Family Practice.
 
+-- SELECT drug_name,COUNT(drug_name) num_script_per_drug
+-- FROM prescription AS script
+-- 	JOIN prescriber AS scribe
+-- 	USING (npi)
+-- 	WHERE scribe.specialty_description ILIKE 'Family Practice'
+-- GROUP BY script.drug_name
+-- ORDER BY num_script_per_drug DESC;
+	
 --     b. Find the top five drugs (generic_name) prescribed 
 -- 	by prescribers with the specialty of Cardiology.
+
+-- SELECT generic_name,COUNT(generic_name) num_script_per_drug
+-- FROM prescription AS script
+-- 	JOIN prescriber AS scribe
+-- 	USING (npi)
+-- 	JOIN drug AS d
+-- 	USING (drug_name)
+-- 	WHERE scribe.specialty_description ILIKE 'Cardiology'
+-- GROUP BY d.generic_name
+-- ORDER BY num_script_per_drug DESC;
 
 --     c. Which drugs are in the top five prescribed by Family
 -- 	Practice prescribers and Cardiologists? Combine what you 
 -- 	did for parts a and b into a single query to answer this question.
 
+-- (SELECT drug_name,COUNT(drug_name) AS num_script_per_drug
+-- FROM prescription AS script
+-- 	JOIN prescriber AS scribe
+-- 	USING (npi)
+-- 	WHERE scribe.specialty_description ILIKE 'Family Practice'
+-- GROUP BY script.drug_name
+-- ORDER BY num_script_per_drug DESC)
+	
+-- 	INTERSECT
+	
+-- (SELECT generic_name,COUNT(generic_name) AS num_script_per_drug
+-- FROM prescription AS script
+-- 	JOIN prescriber AS scribe
+-- 	USING (npi)
+-- 	JOIN drug AS d
+-- 	USING (drug_name)
+-- 	WHERE scribe.specialty_description ILIKE 'Cardiology'
+-- GROUP BY d.generic_name
+-- ORDER BY num_script_per_drug DESC);
+
 -- 3. Your goal in this question is to generate a list of the 
 -- 	top prescribers in each of the major metropolitan areas of Tennessee.
+
 --     a. First, write a query that finds the top 5 prescribers
 -- 	in Nashville in terms of the total number of claims (total_claim_count)
 -- 	across all drugs. Report the npi, the total number of claims,
 -- 	and include a column showing the city.
-    
+-- SELECT 
+-- 	npi,
+-- 	nppes_provider_city AS city,
+-- 	COUNT(total_claim_count) AS claims
+-- FROM prescriber AS scribe
+-- JOIN prescription AS script
+-- USING (npi)
+-- 	WHERE nppes_provider_city ILIKE 'NASHVILLE'
+-- 	GROUP BY scribe.npi, nppes_provider_city, script.total_claim_count
+-- 	ORDER BY claims DESC
+-- 	LIMIT (5);
+
+
 --     b. Now, report the same for Memphis.
-    
+-- SELECT 
+-- 	npi,
+-- 	nppes_provider_city AS city,
+-- 	COUNT(total_claim_count) AS claims
+-- FROM prescriber AS scribe
+-- JOIN prescription AS script
+-- USING (npi)
+-- 	WHERE nppes_provider_city ILIKE 'Memphis'
+-- 	GROUP BY scribe.npi, nppes_provider_city, script.total_claim_count
+-- 	ORDER BY claims DESC
+-- 	LIMIT (5);
+
+
 --     c. Combine your results from a and b, along with the results 
 -- 	for Knoxville and Chattanooga.
+-- SELECT 
+-- 	npi,
+-- 	nppes_provider_city AS city,
+-- 	COUNT(total_claim_count) AS claims
+-- FROM prescriber AS scribe
+-- JOIN prescription AS script
+-- USING (npi)
+-- 	WHERE nppes_provider_city IN ( 'NASHVILLE','MEMPHIS','KNOXVILLE','CHATTANOOGA')
+-- 	GROUP BY scribe.npi, nppes_provider_city, script.total_claim_count
+-- 	ORDER BY claims DESC
+-- 	LIMIT (5);
+
 
 -- 4. Find all counties which had an above-average number of overdose
 -- 	deaths. Report the county name and number of overdose deaths.
+-- I don't want to talk about death today ok? ok
+
 
 -- 5.
 --     a. Write a query that finds the total population of Tennessee.
-    
+-- SELECT sum(population)
+-- FROM population
+-- JOIN fips_county
+-- USING (fipscounty)
+-- WHERE fips_county.state ILIKE 'TN'
+
 --     b. Build off of the query that you wrote in part a to write a
 -- 	query that returns for each county that county's name, its 
 -- 	population, and the percentage of the total population of 
